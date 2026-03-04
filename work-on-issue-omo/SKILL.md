@@ -5,7 +5,7 @@ description: Start working on a GitHub issue in oh-my-opencode — create a link
 
 # Work on GitHub Issue (oh-my-opencode)
 
-Given a GitHub issue number, create a linked branch, have Oracle produce a phased plan (mandatory — no implementation starts without it), delegate each phase to Hephaestus as a separate commit, then open a draft PR. You are an orchestrator — you do not implement yourself.
+Given one or more GitHub issue numbers, create a linked branch per issue, have Oracle produce a phased plan submitted via `submit_plan` (mandatory — no implementation starts without user approval), delegate each phase to Hephaestus as a separate commit, then open a draft PR. You are an orchestrator — you do not implement yourself.
 
 > **Generic agents:** See [`work-on-issue`](../work-on-issue/SKILL.md) for a version that works with any coding agent (Claude Code, Codex, Cursor, etc.).
 
@@ -15,13 +15,23 @@ Use this skill when the user says any of:
 - "work on issue #N", "start issue N", "implement issue N"
 - "ulw work-on-issue N", "work-on-issue-omo N"
 - `/work-on-issue N`
+- "work on issues #9 and #11", "tackle issues 9, 11"
 
 ## Arguments
 
-- `issue_number` (required) — GitHub issue number to work on
+- `issue_numbers` (required) — one or more GitHub issue numbers. Examples: `42`, `9 11`, `9, 11`
+- `comment` (optional) — free-text context or instructions to guide Oracle's plan. Takes priority over anything inferred from the issue.
 - `ulw` (optional, **default: ON**) — ultrawork mode: Oracle planning is mandatory and synchronous, Hephaestus implements with maximum precision, no shortcuts or assumptions allowed
 
 > Ultrawork mode is **on by default**. To disable it explicitly, the user must say `--no-ulw`.
+
+Examples:
+```
+work-on-issue-omo 42
+work-on-issue-omo 9 11
+work-on-issue-omo 42 "focus on the API layer, skip UI changes for now"
+work-on-issue-omo 9 11 "use the existing auth middleware pattern"
+```
 
 ## Ultrawork Mode (ULW)
 
@@ -36,7 +46,19 @@ When disabled (`--no-ulw`):
 - Oracle planning is still recommended but you may proceed with your own plan if Oracle is unavailable
 - Hephaestus is still preferred for implementation but you may implement directly for trivial phases
 
-## Step 0 — Fetch Issue Details
+## Multi-Issue Behavior
+
+When multiple issue numbers are provided, process them **sequentially** — one full cycle (branch → Oracle plan → submit_plan approval → implement → PR) per issue, in the order given. Do not start issue N+1 until issue N has an open draft PR.
+
+After completing all issues, print a final summary listing all PRs.
+
+---
+
+## Per-Issue Workflow
+
+Repeat the following steps for **each** issue number.
+
+### Step 0 — Fetch Issue Details
 
 ```bash
 gh issue view {issue_number} \
@@ -51,7 +73,7 @@ gh repo view --json owner,name,defaultBranchRef \
 
 Store: `{owner}`, `{repo}`, `{issue_number}`, `{issue_title}`, `{issue_body}`, `{default_branch}`.
 
-## Step 1 — Create a Linked Branch
+### Step 1 — Create a Linked Branch
 
 ```bash
 gh issue develop {issue_number} --checkout
@@ -65,9 +87,9 @@ git branch --show-current
 
 > If you need a custom name: `gh issue develop {issue_number} --checkout --name "feat/issue-{issue_number}-{slug}"`
 
-## Step 2 — Oracle Planning (MANDATORY)
+### Step 2 — Oracle Planning (MANDATORY)
 
-Invoke Oracle synchronously with the full issue context. **Do not skip this step. Do not start implementing without Oracle's response.**
+Invoke Oracle synchronously. **Do not skip this step. Do not start implementing without Oracle's response.**
 
 ```typescript
 task(
@@ -86,7 +108,10 @@ ${issue_body}
 REPOSITORY: ${owner}/${repo}
 DEFAULT BRANCH: ${default_branch}
 
-Produce a phased implementation plan where:
+${comment ? `USER GUIDANCE (takes priority over everything else):
+${comment}
+
+` : ""}Produce a phased implementation plan where:
 - Each phase = one atomic, logically complete unit of work
 - Each phase will become exactly ONE git commit
 - Phases are ordered by dependency (foundational work first)
@@ -109,26 +134,35 @@ End your response with exactly: PLAN READY
 
 **Do not proceed to Step 3 until Oracle's response contains `PLAN READY`.**
 
-## Step 3 — Confirm Plan with User
+### Step 3 — Submit Plan for User Approval
 
-Present Oracle's plan to the user and ask for confirmation:
+Take Oracle's plan and call `submit_plan` — **do not print the plan inline, do not ask via chat text**.
 
 ```
-Oracle's Implementation Plan — Issue #{issue_number}: {issue_title}
-══════════════════════════════════════════════════════════════════
+submit_plan(
+  summary="Issue #{issue_number}: {issue_title}",
+  plan="""
+## Issue #{issue_number}: {issue_title}
 
-{oracle_plan}
+{if comment: > **User guidance:** {comment}
+>}
 
-Does this plan look right? Reply "yes" to start, or tell me what to adjust.
+---
+
+{oracle_plan_verbatim}
+  """
+)
 ```
 
-If the user requests changes, re-invoke Oracle with the updated requirements (do not modify the plan yourself).
+**Wait for `submit_plan` to return an approval before proceeding. Do not start Step 4 until approved.**
 
-**Do not proceed to Step 4 until the user confirms the plan.**
+If the user annotates the plan with changes:
+1. Re-invoke Oracle with the updated requirements (do not modify Oracle's plan yourself)
+2. Call `submit_plan` again with the revised Oracle output
 
-## Step 4 — Execute Each Phase via Hephaestus
+### Step 4 — Execute Each Phase via Hephaestus
 
-For each phase from Oracle's confirmed plan, invoke Hephaestus:
+For each phase from the approved Oracle plan, invoke Hephaestus:
 
 ```typescript
 task(
@@ -198,15 +232,13 @@ Print status:
 ✅ Phase N/{total} complete — {commit_sha_short}: {commit_message}
 ```
 
-## Step 5 — Push the Branch
-
-After all phases are committed:
+### Step 5 — Push the Branch
 
 ```bash
 git push -u origin HEAD
 ```
 
-## Step 6 — Open a Draft PR
+### Step 6 — Open a Draft PR
 
 ```bash
 gh pr create \
@@ -234,37 +266,51 @@ Print the PR URL.
 
 > **IMPORTANT:** Always `--draft`. **Never merge without explicit user approval.** This is hardcoded — do not offer to merge, do not merge automatically.
 
-## Step 7 — Summary
+### Step 7 — Issue Summary
 
 ```
-✅ Issue #{issue_number} ready for review.
-
-Branch:  {branch_name}
-PR:      {pr_url} (draft)
-Phases:  {N} commits
-
-Commits:
-  {sha} {phase 1 commit message}
-  {sha} {phase 2 commit message}
-  ...
-
-Oracle plan used: yes
-ULW mode: {on/off}
-
-Next: review the PR, request review, or ask me to address feedback with address-pr-comments-omo.
+✅ Issue #{issue_number} — {issue_title}
+   Branch:       {branch_name}
+   PR:           {pr_url} (draft)
+   Phases:       {N} commits
+   Oracle plan:  yes
+   ULW mode:     {on/off}
 ```
+
+If there are more issues in the list, proceed to the next one from Step 0.
+
+---
+
+## Final Summary (multi-issue only)
+
+After all issues are processed:
+
+```
+✅ All issues complete.
+
+#9  — {title}  →  {pr_url}
+#11 — {title}  →  {pr_url}
+...
+
+Next: review the PRs, request reviews, or ask me to address feedback with address-pr-comments-omo.
+```
+
+---
 
 ## Anti-Patterns
 
 **NEVER (hard stops):**
 - Start implementing before Oracle responds — no exceptions in ULW mode
-- Proceed without user plan confirmation
+- Skip `submit_plan` — never print the plan inline or ask for approval via chat
+- Proceed after `submit_plan` rejection or without approval
 - Implement phases yourself instead of delegating to Hephaestus
 - Merge or push to main — always draft PR only
 - Continue if any subagent (Oracle or Hephaestus) fails to respond — return to user
+- Start the next issue before the current one has an open draft PR
 
 **NEVER (implementation quality):**
 - Bundle multiple phases into one commit — one phase = one commit
 - Let Hephaestus commit — the orchestrator always commits
 - Skip phase verification before committing
-- Modify the Oracle plan without re-invoking Oracle
+- Modify Oracle's plan yourself — re-invoke Oracle if changes are needed
+- Ignore the `comment` argument — pass it to Oracle as highest-priority guidance
