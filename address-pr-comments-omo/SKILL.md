@@ -183,3 +183,4 @@ Commits:
 - Use `gh pr comment` or `gh issue comment` to reply — these add standalone comments, not threaded replies
 - Reply before pushing — always push first so the commit SHA is valid in the reply
 - Pass vague context to `hephaestus` — include the full diff_hunk, file path, line number, and feature description
+- Cancel Hephaestus mid-flight because you found something in the meantime — if you launched it, you collect it; "I have enough context" is never a valid cancellation reason

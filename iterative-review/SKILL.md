@@ -141,6 +141,7 @@ Examples:
 - Accept reviewer feedback blindly — verify against the actual codebase first
 - Spawn the reviewer without the real diff — it cannot review what it cannot see
 - Continue past a 5-round checkpoint without explicit user confirmation
+- Cancel a spawned reviewer subagent because "I already have enough context" — if you launched it, you collect it; cancel only if the entire review loop is being aborted by the user
 
 **NEVER stop early because:**
 - "The code looks fine to me" — if the reviewer has Critical/Important items, address or explicitly reject with reasoning

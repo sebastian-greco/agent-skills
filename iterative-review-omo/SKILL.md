@@ -145,6 +145,7 @@ Examples:
 - Accept Oracle feedback blindly — verify against the actual codebase first
 - Spawn Oracle without the real diff — it cannot review what it cannot see
 - Continue past a 5-round checkpoint without explicit user confirmation
+- Cancel Oracle or Hephaestus mid-flight because "I already have enough context" — if you launched it, you collect it; cancel only if the user aborts the loop entirely
 
 **NEVER stop early because:**
 - "The code looks fine to me" — if Oracle has Critical/Important items, address or explicitly reject with reasoning

@@ -318,6 +318,7 @@ Next: review the PRs, request reviews, or ask me to address feedback with addres
 - Merge or push to main — always draft PR only
 - Continue if any subagent (Oracle or Hephaestus) fails to respond — return to user
 - Start the next issue before the current one has an open draft PR
+- Cancel Oracle or Hephaestus mid-flight because "I already have enough context" — if you launched it, you collect it; "I have enough context" is never a valid cancellation reason
 
 **NEVER (implementation quality):**
 - Bundle multiple phases into one commit — one phase = one commit
