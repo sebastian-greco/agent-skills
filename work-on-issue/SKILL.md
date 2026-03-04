@@ -57,16 +57,26 @@ gh repo view --json owner,name,defaultBranchRef \
 Store: `{owner}`, `{repo}`, `{issue_number}`, `{issue_title}`, `{issue_body}`, `{default_branch}`.
 
 ### Step 1 — Create a Linked Branch
+Derive a slug from the issue title: lowercase, spaces and special characters replaced with hyphens, consecutive hyphens collapsed, truncated to 40 characters, no leading/trailing hyphens.
 
-```bash
-gh issue develop {issue_number} --checkout
+```
+slug = issue_title
+         .toLowerCase()
+         .replace(/[^a-z0-9]+/g, '-')
+         .replace(/^-+|-+$/g, '')
+         .slice(0, 40)
+branch_name = `feat/issue-{issue_number}-{slug}`
 ```
 
-This creates a branch linked to the issue on GitHub and checks it out automatically. GitHub names it from the issue title (e.g. `42-add-dark-mode-toggle`).
+Examples:
+- Issue #42 "Add dark mode toggle" → `feat/issue-42-add-dark-mode-toggle`
+- Issue #9 "Fix: user can't log in with SSO" → `feat/issue-9-fix-user-can-t-log-in-with-sso`
 
-> If you need a custom branch name: `gh issue develop {issue_number} --checkout --name "feat/issue-{issue_number}-{slug}"`
+```bash
+gh issue develop {issue_number} --checkout --name "{branch_name}"
+```
 
-Confirm you are on the new branch:
+Confirm:
 
 ```bash
 git branch --show-current
