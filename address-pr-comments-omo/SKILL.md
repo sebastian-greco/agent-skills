@@ -11,6 +11,25 @@ Fetch all open PR review comments, triage them by criticality, fix every issue (
 
 > **Generic version:** See [`address-pr-comments`](../address-pr-comments/SKILL.md) for a version that works with any coding agent.
 
+## ⚠️ Agent Discipline — Read Before Starting
+
+These rules govern every subagent call in this skill. They override your instincts.
+
+**1. You are a blocker, not a poller.**
+All `task()` calls in this skill use `run_in_background=false`. This means they are synchronous — the runtime blocks until the subagent responds. You do not poll. You do not call `background_output`. You do not set timers. You just wait.
+
+**2. Silence is not stuck.**
+An agent that hasn't responded yet is working. Agents can take 2–10 minutes on complex tasks. "It's taking a while" is not a signal to act.
+
+**3. You have exactly one job while waiting: nothing.**
+Do not read files. Do not grep. Do not "prepare" for the next step. Wait. Your context window is not a resource to fill — it is a resource to preserve.
+
+**4. Cancellation is forbidden except on user instruction.**
+You may not cancel Hephaestus for any reason you invent. Only the user can abort a running agent.
+
+**5. If an agent genuinely errors or times out (system-level failure):**
+Stop. Tell the user what happened and which step failed. Do not attempt the work yourself. Do not retry without being asked.
+
 ## Trigger
 
 Use this skill when the user says any of:
